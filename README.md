@@ -10,7 +10,7 @@ Supports saving and loading via NBT as well as serializing NBT data into configu
 ### Serializers
 This library provides BinaryTag serializers that can be used independently with any Configurate loader.
 Since NBT needs to maintain type, two different kinds of serializers are provided:
-- **Type-Safe Serializers** preserve exact numeric types by appending SNBT-style suffixes (`b`, `s`, `i`, `l`, `f`, `d`) to ensure correct NBT tag reconstruction across all formats.
+- **Type-Safe Serializers** preserve exact numeric types by appending SNBT-style suffixes (`b`, `s`, `i`, `l`, `f`, `d`).
 - **Type-Unsafe Serializers** relies on the configuration loader to de-serialize to correct numeric type. Some loaders (HOCON, JSON, YAML, etc.) do not preserve type and as such will not de-serialize correctly.
 
 For both kinds a static `TypeSerializerCollection` is accessible in `BinaryTagSerializer`
@@ -86,3 +86,7 @@ try {
         throw new RuntimeException(e);
 }
 ```
+
+# License
+
+This project is licensed under the GPLv3 License - see the [LICENSE.md](LICENSE.md) file for details

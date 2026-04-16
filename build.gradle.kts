@@ -1,7 +1,7 @@
 plugins {
-    id("java")
-    id("maven-publish")
-    id("idea")
+    `java-library`
+    `maven-publish`
+    idea
 }
 
 repositories {
@@ -13,10 +13,12 @@ repositories {
 }
 
 dependencies {
-    compileOnly(libs.jspecify)
+    api(libs.jspecify)
+    api(libs.bundles.adventureAPI)
+    api(libs.configurateCore)
 
-    implementation(libs.configurateCore)
-    implementation(libs.bundles.adventureAPI)
+    implementation(libs.configurateYaml)
+
 
     testImplementation(libs.junitJupiter)
     testRuntimeOnly(libs.bundles.junitJupiterRuntime)

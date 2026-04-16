@@ -11,9 +11,17 @@ Supports saving and loading via NBT as well as serializing NBT data into configu
 This library provides BinaryTag serializers that can be used independently with any Configurate loader.
 Since NBT needs to maintain type, two different kinds of serializers are provided:
 - **Type-Safe Serializers** preserve exact numeric types by appending SNBT-style suffixes (`b`, `s`, `i`, `l`, `f`, `d`).
-- **Type-Unsafe Serializers** relies on the configuration loader to de-serialize to correct numeric type. Some loaders (HOCON, JSON, YAML, etc.) do not preserve type and as such will not de-serialize correctly.
+- **Type-Unsafe Serializers** relies on the configuration loader to de-serialize to correct numeric type. Some loaders
+(HOCON, JSON, YAML, etc.) do not preserve type and as such will not de-serialize correctly.
 
 For both kinds a static `TypeSerializerCollection` is accessible in `BinaryTagSerializer`
+
+#### A Note on Lists
+Adventure NBT lists can support heterogeneity (a list with multiple tag types), but, for this a list must be explicitly
+created with support for it. When deserializing lists the deserializer will always presume that a list that deserializes
+to one type should be created as a non-heterogeneity supporting list. This means that if a list that supports
+heterogeneity but only contains one tag type is serialized upon deserialization a non-heterogeneity supporting list will
+be returned.
 
 ## Installation
 
@@ -60,14 +68,14 @@ loader.save(node);
 ### Saving an `ItemStack` in a YAML file with the Minecraft Paper API
 
 ```java
-// Creat YAML loader
+// Create YAML loader
 YamlConfigurationLoader loader = YamlConfigurationLoader.builder()
         .defaultOptions(o ->
                 o.serializers(o.serializers()
                     .childBuilder()
                     .registerAll(BinaryTagSerializer.TYPE_SAFE_SERIALIZERS)
                     .build()))
-        .path("example.yml")
+        .path(Path.of("example.yml"))
         .nodeStyle(NodeStyle.BLOCK)
         .build();
 

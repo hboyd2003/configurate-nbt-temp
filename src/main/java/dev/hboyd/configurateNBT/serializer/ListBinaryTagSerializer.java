@@ -1,6 +1,7 @@
 package dev.hboyd.configurateNBT.serializer;
 
 import net.kyori.adventure.nbt.BinaryTag;
+import net.kyori.adventure.nbt.BinaryTagType;
 import net.kyori.adventure.nbt.ListBinaryTag;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -10,6 +11,8 @@ import org.spongepowered.configurate.serialize.SerializationException;
 import org.spongepowered.configurate.serialize.TypeSerializer;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
@@ -24,10 +27,25 @@ public class ListBinaryTagSerializer implements TypeSerializer<ListBinaryTag> {
         final TypeSerializer<BinaryTag> binaryTagSerializer =
                 requireNonNull(node.options().serializers().get(BinaryTag.class), "BinaryTag serializer");
 
-        for (ConfigurationNode childNode : node.childrenList())
-            binaryTagSerializer.deserialize(type, childNode);
+        final List<BinaryTag> binaryTags = new ArrayList<>(node.childrenList().size());
+        BinaryTagType<?> listType = null;
+        boolean heterogeneous = false;
+        for (ConfigurationNode childNode : node.childrenList()) {
+            final BinaryTag binaryTag = binaryTagSerializer.deserialize(type, childNode);
 
-        return ListBinaryTag.builder().build();
+            if (listType == null) listType = binaryTag.type();
+            else if (listType != binaryTag.type()) heterogeneous = true;
+
+            binaryTags.add(binaryTag);
+        }
+
+        final ListBinaryTag.Builder<?> builder;
+        if (heterogeneous) builder = ListBinaryTag.heterogeneousListBinaryTag(binaryTags.size());
+        else builder = ListBinaryTag.builder(listType, binaryTags.size());
+
+        builder.add((Iterable) binaryTags);
+
+        return builder.build();
     }
 
     @Override

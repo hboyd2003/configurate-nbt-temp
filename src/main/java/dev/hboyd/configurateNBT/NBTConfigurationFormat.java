@@ -23,7 +23,6 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.loader.ConfigurationFormat;
 import org.spongepowered.configurate.loader.ConfigurationLoader;
 
-import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.Set;
@@ -49,11 +48,7 @@ public class NBTConfigurationFormat implements ConfigurationFormat {
      */
     @Override
     public NBTConfigurationLoader create(Path file, ConfigurationNode options) {
-        try {
-            return NBTConfigurationLoader.builder().path(file).defaultOptions(options.options()).build();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return NBTConfigurationLoader.builder().path(file).defaultOptions(options.options()).build();
     }
 
     /**

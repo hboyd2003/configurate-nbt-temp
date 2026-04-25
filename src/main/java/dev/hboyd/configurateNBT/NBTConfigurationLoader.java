@@ -19,14 +19,12 @@
 package dev.hboyd.configurateNBT;
 
 import dev.hboyd.configurateNBT.serializer.BinaryTagSerializer;
+import net.kyori.adventure.builder.AbstractBuilder;
 import net.kyori.adventure.nbt.BinaryTagIO;
 import net.kyori.adventure.nbt.CompoundBinaryTag;
-import net.kyori.option.Option;
-import net.kyori.option.OptionSchema;
-import net.kyori.option.OptionState;
-import net.kyori.option.value.ValueSource;
-import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
+import net.kyori.adventure.util.Buildable;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
+import org.jetbrains.annotations.Contract;
 import org.spongepowered.configurate.BasicConfigurationNode;
 import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.ConfigurationNode;
@@ -45,30 +43,32 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static java.util.Objects.requireNonNull;
 
-@NullMarked
-public final class NBTConfigurationLoader implements ConfigurationLoader<BasicConfigurationNode> {
+/**
+ * TODO: NBTConfigurationLoader JavaDoc.
+ */
+public final class NBTConfigurationLoader implements ConfigurationLoader<BasicConfigurationNode>, Buildable<NBTConfigurationLoader, NBTConfigurationLoader.Builder> {
     private static final Set<Class<?>> NATIVE_TYPES = UnmodifiableCollections.toSet(
             Integer.class, Double.class, Byte.class, Long.class, Short.class, Float.class, // numeric
             int[].class, byte[].class, long[].class, String.class); // complex types
 
-
-    private final @Nullable Callable<BufferedInputStream> source;
-    private final @Nullable Callable<BufferedOutputStream> sink;
+    private final Callable<BufferedInputStream> source;
+    private final Callable<BufferedOutputStream> sink;
     private final ConfigurationOptions defaultOptions;
-    private final BinaryTagIO.Compression compression;
+    private final BinaryTagIO.Compression compressor;
 
-    private NBTConfigurationLoader(Builder builder) {
-        this.source = builder.source();
-        this.sink = builder.sink();
-        this.defaultOptions = builder.defaultOptions();
-        
-        this.compression = builder.optionState().value(Builder.COMPRESSION).compression();
+    private NBTConfigurationLoader(Callable<BufferedInputStream> source,
+                                   Callable<BufferedOutputStream> sink,
+                                   BinaryTagIO.Compression compressor,
+                                   ConfigurationOptions defaultOptions) {
+        this.source = source;
+        this.sink = sink;
+        this.compressor = compressor;
+        this.defaultOptions = defaultOptions;
     }
 
     /**
@@ -129,7 +129,7 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
         BasicConfigurationNode node = createNode(options);
 
         try {
-            final CompoundBinaryTag tag = BinaryTagIO.unlimitedReader().read(inputStream, compression);
+            final CompoundBinaryTag tag = BinaryTagIO.unlimitedReader().read(inputStream, compressor);
 
             final TypeSerializer<CompoundBinaryTag> serializer
                     = requireNonNull(node.options().serializers().get(CompoundBinaryTag.class), "CompoundBinaryTag serializer");
@@ -173,7 +173,7 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
             throw new RuntimeException(e);
         }
 
-        save(node, outputStream, compression);
+        save(node, outputStream, compressor);
     }
 
     /**
@@ -186,7 +186,7 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
      */
     public byte[] saveToBytes(ConfigurationNode node) throws ConfigurateException {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        save(node, new BufferedOutputStream(byteArrayOutputStream), compression);
+        save(node, new BufferedOutputStream(byteArrayOutputStream), this.compressor);
         return byteArrayOutputStream.toByteArray();
     }
 
@@ -226,90 +226,57 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
         return this.defaultOptions;
     }
 
+    @Override
+    public Builder toBuilder() {
+        return new Builder()
+                .sink(sink)
+                .source(source)
+                .compressor(compressor)
+                .defaultOptions(defaultOptions);
+    }
+
     public static Builder builder() {
         return new Builder();
     }
 
-    public static final class Builder {
-        private static final String CONFIGURATE_PREFIX = "configurate";
-
-        private static final OptionSchema.Mutable UNSAFE_SCHEMA = OptionSchema.emptySchema();
-        private static final OptionSchema SCHEMA = UNSAFE_SCHEMA.frozenView();
-
-        public static final Option<NBTCompression> COMPRESSION = UNSAFE_SCHEMA.enumOption("nbt:compression", NBTCompression.class, NBTCompression.GZIP);
-
-        private OptionState.Builder optionBuilder;
-        private @Nullable OptionState optionState;
+    public static final class Builder implements AbstractBuilder<NBTConfigurationLoader>, Buildable.Builder<NBTConfigurationLoader> {
         private ConfigurationOptions defaultOptions;
 
-        private Callable<BufferedInputStream> source;
-        private Callable<BufferedOutputStream> sink;
+        private @MonotonicNonNull Callable<BufferedInputStream> source;
+        private @MonotonicNonNull Callable<BufferedOutputStream> sink;
+        private BinaryTagIO.Compression compressor;
 
         private Builder() {
             this.defaultOptions = ConfigurationOptions.defaults()
                     .serializers(TypeSerializerCollection.defaults().childBuilder()
                             .registerAll(BinaryTagSerializer.TYPE_SAFE_SERIALIZERS).build())
                     .nativeTypes(NATIVE_TYPES);
-            this.optionBuilder = SCHEMA.stateBuilder()
-                    .values(ValueSource.systemProperty(CONFIGURATE_PREFIX))
-                    .values(ValueSource.environmentVariable(CONFIGURATE_PREFIX));
-            this.optionState = null;
-        }
-
-        /**
-         * Compute a snapshot of the currently set options for created loaders.
-         *
-         * @return the option state
-         */
-        public OptionState optionState() {
-            if (this.optionState == null)
-                this.optionState = this.optionBuilder.build();
-
-            return this.optionState;
-        }
-
-            public Builder optionState(final OptionState state) {
-            this.optionBuilder = SCHEMA.stateBuilder()
-                    .values(state);
-            this.optionState = null;
-
-            return this;
-        }
-
-        /**
-         * Modify the state of loader options set on this loader.
-         *
-         * @param builderConsumer a consumer that receives the modifier to
-         *                        perform changes
-         * @return this builder
-         */
-            public Builder editOptions(final Consumer<OptionState.Builder> builderConsumer) {
-            this.optionState = null;
-            builderConsumer.accept(this.optionBuilder);
-            return this;
+            this.compressor = BinaryTagIO.Compression.GZIP;
         }
 
         /**
          * Sets the sink and source of the resultant loader to the given file.
          *
-         * <p>The {@link #source() source} is defined using {@link Files#newInputStream(Path, OpenOption...)}</p>
+         * <p>The source is defined using {@link Files#newInputStream(Path, OpenOption...)}</p>
          *
-         * <p>The {@link #sink() sink} is defined using {@link Files#newOutputStream(Path, OpenOption...)}</p>
+         * <p>The sink is defined using {@link Files#newOutputStream(Path, OpenOption...)}</p>
          *
          * @param file the configuration file
-         * @return this builder (for chaining)
+         * @return this builder
          */
-            public Builder file(final File file) throws IOException {
-            return path(requireNonNull(file, "file").toPath());
+        @Contract(value = "_ -> this")
+        public Builder file(final File file) {
+            return this.path(requireNonNull(file, "file").toPath());
         }
 
         /**
          * Sets the sink and source of the resultant loader to the given path.
          *
          * @param path the path of the configuration file
-         * @return this builder (for chaining)
+         * @return this builder
          */
-            public Builder path(final Path path) throws IOException {
+        @Contract(value = "_ -> this")
+        public Builder path(final Path path) {
             final Path absPath = requireNonNull(path, "path").toAbsolutePath();
             this.source = () -> new BufferedInputStream(Files.newInputStream(absPath));
             this.sink = () -> new BufferedOutputStream(Files.newOutputStream(absPath));
@@ -322,22 +289,12 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
          * <p>The "source" is used by the loader to load the configuration.</p>
          *
          * @param source the source
-         * @return this builder (for chaining)
+         * @return this builder
          */
-            public Builder source(final Callable<BufferedInputStream> source) {
+        @Contract(value = "_ -> this")
+        public Builder source(final Callable<BufferedInputStream> source) {
             this.source = source;
             return this;
-        }
-
-        /**
-         * Gets the source to be used by the resultant loader.
-         *
-         * <p>Can be null (for loaders which only support saving with {@link NBTConfigurationLoader#saveToBytes(ConfigurationNode)})</p>
-         * 
-         * @return the source
-         */
-        public @Nullable Callable<BufferedInputStream> source() {
-            return this.source;
         }
 
         /**
@@ -346,22 +303,24 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
          * <p>The "sink" is used by the loader to save the configuration.</p>
          *
          * @param sink the sink
-         * @return this builder (for chaining)
+         * @return this builder
          */
-            public Builder sink(final Callable<BufferedOutputStream> sink) {
-            this.sink = sink;
+        @Contract(value = "_ -> this")
+        public Builder sink(final Callable<BufferedOutputStream> sink) {
+            this.sink = requireNonNull(sink, "sink");
             return this;
         }
 
         /**
-         * Gets the sink to be used by the resultant loader.
+         * Sets the compression that will be used by the resultant loader.
          *
-         * <p>Can be null (for loaders which only support loading with {@link NBTConfigurationLoader#loadFromBytes(byte[])})</p>
-         * 
-         * @return the sink
+         * @param compressor type of compression to use
+         * @return this builder
          */
-        public @Nullable Callable<BufferedOutputStream> sink() {
-            return this.sink;
+        @Contract(value = "_ -> this")
+        public Builder compressor(final BinaryTagIO.Compression compressor) {
+            this.compressor = requireNonNull(compressor, "compressionType");
+            return this;
         }
 
         /**
@@ -369,9 +328,10 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
          * resultant loader.
          *
          * @param defaultOptions the options
-         * @return this builder (for chaining)
+         * @return this builder
          */
-            public Builder defaultOptions(final ConfigurationOptions defaultOptions) {
+        @Contract(value = "_ -> this")
+        public Builder defaultOptions(final ConfigurationOptions defaultOptions) {
             this.defaultOptions = requireNonNull(defaultOptions, "defaultOptions");
             return this;
         }
@@ -381,33 +341,13 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
          * loader by providing a function which takes the current default
          * options and applies any desired changes.
          *
-         * @param defaultOptions to transform the existing default options
-         * @return this builder (for chaining)
+         * @param defaultOptionsOperator to transform the existing default options
+         * @return this builder
          */
-            public Builder defaultOptions(final UnaryOperator<ConfigurationOptions> defaultOptions) {
-            this.defaultOptions = requireNonNull(defaultOptions.apply(this.defaultOptions), "defaultOptions (updated)");
+        @Contract(value = "_ -> this")
+        public Builder defaultOptions(final UnaryOperator<ConfigurationOptions> defaultOptionsOperator) {
+            this.defaultOptions = requireNonNull(defaultOptionsOperator.apply(this.defaultOptions), "defaultOptions (updated)");
             return this;
-        }
-
-        /**
-         * Sets the compression that will be used by the resultant loader.
-         *
-         * @param compressionType type of compression to use
-         * @return this builder (for chaining)
-         */
-            public Builder compression(final NBTCompression compressionType) {
-            this.optionBuilder.value(COMPRESSION, compressionType);
-            return this;
-        }
-
-        /**
-         * Gets the default configuration options to be used by the resultant
-         * loader.
-         *
-         * @return the options
-         */
-        public ConfigurationOptions defaultOptions() {
-            return this.defaultOptions;
         }
 
         /**
@@ -415,8 +355,13 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
          *
          * @return a new loader
          */
+        @Override
+        @Contract(value = " -> new")
         public NBTConfigurationLoader build() {
-            return new NBTConfigurationLoader(this);
+            requireNonNull(source, "source");
+            requireNonNull(sink, "sink");
+
+            return new NBTConfigurationLoader(source, sink, compressor, defaultOptions);
         }
 
         /**

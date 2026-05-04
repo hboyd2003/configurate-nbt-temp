@@ -29,14 +29,20 @@ import org.spongepowered.configurate.BasicConfigurationNode;
 import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.ConfigurationOptions;
-import org.spongepowered.configurate.loader.*;
+import org.spongepowered.configurate.loader.ConfigurationLoader;
 import org.spongepowered.configurate.reference.ConfigurationReference;
 import org.spongepowered.configurate.reference.WatchServiceListener;
 import org.spongepowered.configurate.serialize.TypeSerializer;
 import org.spongepowered.configurate.serialize.TypeSerializerCollection;
 import org.spongepowered.configurate.util.UnmodifiableCollections;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.OpenOption;
@@ -49,7 +55,9 @@ import java.util.function.UnaryOperator;
 import static java.util.Objects.requireNonNull;
 
 /**
- * TODO: NBTConfigurationLoader JavaDoc.
+ * Loads and saves {@link ConfigurationNode}s in the <a href="https://minecraft.wiki/w/NBT_format">NBT Format</a>.
+ *
+ * @see <a href="https://minecraft.wiki/w/NBT_format">NBT Format</a>
  */
 public final class NBTConfigurationLoader implements ConfigurationLoader<BasicConfigurationNode>, Buildable<NBTConfigurationLoader, NBTConfigurationLoader.Builder> {
     private static final Set<Class<?>> NATIVE_TYPES = UnmodifiableCollections.toSet(
@@ -61,10 +69,10 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
     private final ConfigurationOptions defaultOptions;
     private final BinaryTagIO.Compression compressor;
 
-    private NBTConfigurationLoader(Callable<BufferedInputStream> source,
-                                   Callable<BufferedOutputStream> sink,
-                                   BinaryTagIO.Compression compressor,
-                                   ConfigurationOptions defaultOptions) {
+    private NBTConfigurationLoader(final Callable<BufferedInputStream> source,
+                                   final Callable<BufferedOutputStream> sink,
+                                   final BinaryTagIO.Compression compressor,
+                                   final ConfigurationOptions defaultOptions) {
         this.source = source;
         this.sink = sink;
         this.compressor = compressor;
@@ -83,15 +91,15 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
      *                              parsing the configuration
      */
     @Override
-    public BasicConfigurationNode load(ConfigurationOptions options) throws ConfigurateException {
-        BufferedInputStream inputStream;
+    public BasicConfigurationNode load(final ConfigurationOptions options) throws ConfigurateException {
+        final BufferedInputStream inputStream;
         try {
-            inputStream = source.call();
-        } catch (Exception e) {
+            inputStream = this.source.call();
+        } catch (final Exception e) {
             throw new RuntimeException(e);
         }
 
-        return load(options, inputStream);
+        return this.load(options, inputStream);
     }
 
     /**
@@ -106,7 +114,7 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
      *                              parsing the configuration
      */
     public BasicConfigurationNode loadFromBytes(final byte[] input) throws ConfigurateException {
-        return loadFromBytes(defaultOptions, input);
+        return this.loadFromBytes(this.defaultOptions, input);
     }
 
     /**
@@ -121,21 +129,21 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
      * @throws ConfigurateException if any sort of error occurs with reading or
      *                              parsing the configuration
      */
-    public BasicConfigurationNode loadFromBytes(ConfigurationOptions options, final byte[] input) throws ConfigurateException {
-        return load(options, new BufferedInputStream(new ByteArrayInputStream(input)));
+    public BasicConfigurationNode loadFromBytes(final ConfigurationOptions options, final byte[] input) throws ConfigurateException {
+        return this.load(options, new BufferedInputStream(new ByteArrayInputStream(input)));
     }
 
-    private BasicConfigurationNode load(ConfigurationOptions options, BufferedInputStream inputStream) throws ConfigurateException {
-        BasicConfigurationNode node = createNode(options);
+    private BasicConfigurationNode load(final ConfigurationOptions options, final BufferedInputStream inputStream) throws ConfigurateException {
+        final BasicConfigurationNode node = this.createNode(options);
 
         try {
-            final CompoundBinaryTag tag = BinaryTagIO.unlimitedReader().read(inputStream, compressor);
+            final CompoundBinaryTag tag = BinaryTagIO.unlimitedReader().read(inputStream, this.compressor);
 
             final TypeSerializer<CompoundBinaryTag> serializer
                     = requireNonNull(node.options().serializers().get(CompoundBinaryTag.class), "CompoundBinaryTag serializer");
             serializer.serialize(CompoundBinaryTag.class, tag, node);
         } catch (FileNotFoundException | NoSuchFileException _) {
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new ConfigurateException(e);
         }
 
@@ -165,15 +173,15 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
      *                     generating the configuration
      */
     @Override
-    public void save(ConfigurationNode node) throws ConfigurateException {
-        BufferedOutputStream outputStream;
+    public void save(final ConfigurationNode node) throws ConfigurateException {
+        final BufferedOutputStream outputStream;
         try {
-            outputStream = sink.call();
-        } catch (Exception e) {
+            outputStream = this.sink.call();
+        } catch (final Exception e) {
             throw new RuntimeException(e);
         }
 
-        save(node, outputStream, compressor);
+        save(node, outputStream, this.compressor);
     }
 
     /**
@@ -184,13 +192,13 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
      * @throws ConfigurateException if any sort of error occurs with writing or
      *                     generating the configuration
      */
-    public byte[] saveToBytes(ConfigurationNode node) throws ConfigurateException {
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    public byte[] saveToBytes(final ConfigurationNode node) throws ConfigurateException {
+        final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         save(node, new BufferedOutputStream(byteArrayOutputStream), this.compressor);
         return byteArrayOutputStream.toByteArray();
     }
 
-    private static void save(ConfigurationNode node, BufferedOutputStream outputStream, BinaryTagIO.Compression compression) throws ConfigurateException {
+    private static void save(final ConfigurationNode node, final BufferedOutputStream outputStream, final BinaryTagIO.Compression compression) throws ConfigurateException {
         final TypeSerializer<CompoundBinaryTag> serializer
                 = requireNonNull(node.options().serializers().get(CompoundBinaryTag.class), "CompoundBinaryTag serializer");
         final CompoundBinaryTag tag = serializer.deserialize(CompoundBinaryTag.class, node);
@@ -198,9 +206,9 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
         try {
             BinaryTagIO.writer().write(tag, outputStream, compression);
             outputStream.close();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new ConfigurateException(e);
-        } catch (Exception e) {
+        } catch (final Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -212,7 +220,7 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
      * @return newly created empty node
      */
     @Override
-    public BasicConfigurationNode createNode(ConfigurationOptions options) {
+    public BasicConfigurationNode createNode(final ConfigurationOptions options) {
         return BasicConfigurationNode.root(options);
     }
 
@@ -229,16 +237,24 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
     @Override
     public Builder toBuilder() {
         return new Builder()
-                .sink(sink)
-                .source(source)
-                .compressor(compressor)
-                .defaultOptions(defaultOptions);
+                .sink(this.sink)
+                .source(this.source)
+                .compressor(this.compressor)
+                .defaultOptions(this.defaultOptions);
     }
 
+    /**
+     * Create a new builder for {@link NBTConfigurationLoader} instances.
+     *
+     * @return a new builder
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Builder for {@link NBTConfigurationLoader} instances.
+     */
     public static final class Builder implements AbstractBuilder<NBTConfigurationLoader>, Buildable.Builder<NBTConfigurationLoader> {
         private ConfigurationOptions defaultOptions;
 
@@ -358,10 +374,10 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
         @Override
         @Contract(value = " -> new")
         public NBTConfigurationLoader build() {
-            requireNonNull(source, "source");
-            requireNonNull(sink, "sink");
+            requireNonNull(this.source, "source");
+            requireNonNull(this.sink, "sink");
 
-            return new NBTConfigurationLoader(source, sink, compressor, defaultOptions);
+            return new NBTConfigurationLoader(this.source, this.sink, this.compressor, this.defaultOptions);
         }
 
         /**
@@ -370,7 +386,7 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
          * @param input the input to load
          * @return a deserialized node
          */
-            public ConfigurationNode buildAndLoadByteArray(final byte[] input) throws ConfigurateException {
+        public ConfigurationNode buildAndLoadByteArray(final byte[] input) throws ConfigurateException {
             return this.source(() -> new BufferedInputStream(new ByteArrayInputStream(input)))
                     .build()
                     .load();
@@ -382,7 +398,7 @@ public final class NBTConfigurationLoader implements ConfigurationLoader<BasicCo
          * @param output the node to write
          * @return the output byte array
          */
-            public byte[] buildAndSaveByteArray(final ConfigurationNode output) throws ConfigurateException {
+        public byte[] buildAndSaveByteArray(final ConfigurationNode output) throws ConfigurateException {
             requireNonNull(output, "output");
             final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             this.sink(() -> new BufferedOutputStream(outputStream))

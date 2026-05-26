@@ -75,7 +75,7 @@ public final class ListBinaryTagSerializer implements TypeSerializer<ListBinaryT
     }
 
     @Override
-    public @Nullable ListBinaryTag emptyValue(final Type specificType, final ConfigurationOptions options) {
+    public ListBinaryTag emptyValue(final Type specificType, final ConfigurationOptions options) {
         return ListBinaryTag.builder().build();
     }
 }

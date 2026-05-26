@@ -6,14 +6,7 @@ plugins {
     alias(libs.plugins.indraPublishing)
     alias(libs.plugins.indraLicenserSpotless)
     alias(libs.plugins.indraCheckstyle)
-}
-
-repositories {
-    mavenCentral()
-    maven {
-        name = "hboyd-dev-repo"
-        url = uri("https://repo.hboyd.dev/snapshots/")
-    }
+    alias(libs.plugins.gitSimpleSemver)
 }
 
 dependencies {

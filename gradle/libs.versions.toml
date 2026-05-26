@@ -26,6 +26,7 @@ configurateCore = { group = "org.spongepowered", name = "configurate-core", vers
 jspecify = { group = "org.jspecify", name = "jspecify", version.ref = "jspecify" }
 checkerFramework = { group = "org.checkerframework", name = "checker-qual", version.ref = "checkerFramework" }
 jetbrainsAnnotations = { group = "org.jetbrains", name = "annotations", version.ref = "jetbrainsAnnotations" }
+configurateYaml = { group = "org.spongepowered", name = "configurate-gson", version.ref = "configurate" }
 
 # Adventure
 adventureAPI = { group = "net.kyori",  name = "adventure-api", version.ref = "adventureAPI" }

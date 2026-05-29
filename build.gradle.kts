@@ -1,3 +1,5 @@
+import org.danilopianini.gradle.gitsemver.UpdateType
+
 plugins {
     `java-library`
     `maven-publish`
@@ -6,6 +8,7 @@ plugins {
     alias(libs.plugins.indraPublishing)
     alias(libs.plugins.indraLicenserSpotless)
     alias(libs.plugins.indraCheckstyle)
+    alias(libs.plugins.gitSemVerPlugin)
 }
 
 repositories {
@@ -25,6 +28,21 @@ dependencies {
 
     testImplementation(libs.junitJupiter)
     testRuntimeOnly(libs.bundles.junitJupiterRuntime)
+}
+
+gitSemVer {
+    commitNameBasedUpdateStrategy { commits ->
+        commits.maxOfOrNull { commit ->
+            when {
+                commit.matches("(^[a-z]+(\\([^)]+\\))?!: .+$)|(^[a-z]+(\\([^)]+\\))?!?: .+BREAKING CHANGE: .*$)".toRegex()) -> UpdateType.MAJOR
+                commit.matches("^(feat|perf)(\\([^)]+\\))?: .+$".toRegex()) -> UpdateType.MINOR
+                commit.matches("^(fix(\\([^)]+\\))?|chore\\(deps\\)): .+$".toRegex()) -> UpdateType.PATCH
+                else -> UpdateType.NONE
+            }
+        } ?: UpdateType.NONE
+    }
+    versionPrefix = "v"
+    developmentIdentifier = "SNAPSHOT"
 }
 
 indra {
@@ -69,6 +87,8 @@ spotless {
         formatAnnotations()
     }
 }
+
+
 
 idea {
     module {

@@ -1,7 +1,7 @@
 [versions]
 # Gradle Plugins
 indra = "4.0.0"
-checkstyle = "13.4.0"
+checkstyle = "13.7.0"
 gitSimpleSemver = "2.0.2"
 
 # Libraries
